@@ -73,3 +73,6 @@ group :test do
   gem "selenium-webdriver"
   gem "webdrivers"
 end
+
+gem "pg", "~> 1.7"
+gem "solid_queue", "~> 1.7"
