@@ -3,40 +3,31 @@ config:
   theme: neo
 ---
 flowchart TB
-  Modules["Módulos internos Buk"]
-  subgraph EC2["AWS EC2: procesos separados"]
-    Web["Rails Web: API, auditoría y webhook"]
-    AI["Pool ai_generation"]
-    Critical["Pool delivery_critical"]
-    Standard["Pool delivery_standard"]
-  end
-  subgraph PG["PostgreSQL compartido"]
-    Business[("Requests, deliveries, attempts, provider_events")]
-    Freq[("Frequency buckets y reservations")]
-    SQ[("Solid Queue: jobs y ejecuciones")]
-    AIData[("AI budgets y template cache")]
-    Future[("COALESCE: grupo y eventos (diseño futuro)")]
-  end
-  LLM["LLM Gateway externo"]
-  SG["SendGrid API + Event Webhook"]
-  Modules --> Web
-  Web --> Business
-  Web --> Freq
-  Web --> SQ
-  SQ --> AI
-  SQ --> Critical
-  SQ --> Standard
-  AI --> LLM
-  AI --> AIData
-  AI --> Business
-  AI --> SQ
-  Critical --> Business
-  Standard --> Business
-  Critical -->|"HTTPS Mail Send"| SG
-  Standard -->|"HTTPS Mail Send"| SG
-  SG -->|"HTTPS webhook firmado"| Web
-  Standard -.->|"Cierre futuro sin nuevo pool"| Future
-  Future -.-> Business
-  Future -.-> Freq
+  Modules["Módulos Buk"] --> API["AbstractNotification.deliver"]
+  API --> Registry["Definition Registry"] --> Policy{"Policy Engine"}
+  Policy -->|"DELIVER: admitir y reservar"| DB[("PostgreSQL: requests y deliveries")]
+  Policy -->|"SUPPRESS: razón auditable"| DB
+  Policy -.->|"COALESCE: extensión propuesta"| Group[("Grupo por destinatario, entidad y ventana")]
+  Group -.->|"Cierre futuro en delivery_standard"| Eligibility["Estado vigente + reevaluar canales"]
+  Eligibility -.->|"Sin cupo: reprogramar, no suprimir"| Group
+  Eligibility -.->|"Entrega consolidada y reserva única"| DB
+  Policy --> Freq[("Frequency buckets y reservations")]
+  DB -->|"Encolado en misma transacción"| SQ[("Solid Queue")]
+  SQ -->|"Solo dinámicas"| AI["Pool ai_generation"]
+  AI --> Guard["Masking, validación y fallback"]
+  Guard --> LLM["LLM Gateway"]
+  LLM --> Guard
+  Guard -->|"Persistir contenido; encolar entrega"| DB
+  SQ --> Critical["Pool delivery_critical"]
+  SQ --> Standard["Pool delivery_standard"]
+  Critical --> Adapter["Channel Adapter Registry"]
+  Standard --> Adapter
+  Adapter --> SG["SendGrid"]
+  SG --> Hook["Webhook firmado y deduplicado"]
+  Hook --> DB
+  DB --> Audit["Auditoría por solicitud, canal e intento"]
+  Group -.-> Audit
+
+
 
         linkStyle default stroke:#808080
