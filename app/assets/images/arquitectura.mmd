@@ -3,69 +3,40 @@ config:
   theme: neo
 ---
 flowchart TB
-    Producers["Módulos Buk: Nómina, Personas, Encuestas"]
-    API["AbstractNotification.deliver"]
-    Registry["Definition Registry"]
-    Policy{"Policy Engine"}
-
-    DB[("PostgreSQL: requests, deliveries, attempts, events")]
-    Frequency[("Frequency buckets / reservations")]
-    Groups[("Coalescing groups + eventos originales")]
-    Queue[("Solid Queue: jobs en la misma BD")]
-
-    Close["CloseCoalescingWindowJob"]
-    Snapshot["Consultar estado vigente"]
-    Eligibility{"Reevaluar elegibilidad y canales"}
-
+  Modules["Módulos internos Buk"]
+  subgraph EC2["AWS EC2: procesos separados"]
+    Web["Rails Web: API, auditoría y webhook"]
     AI["Pool ai_generation"]
-    Guard["Masking, validación y fallback"]
-    LLM["LLM Gateway"]
-    Content["Persistir contenido validado"]
-
     Critical["Pool delivery_critical"]
     Standard["Pool delivery_standard"]
-    Adapter["Channel Adapter Registry"]
-    SG["SendGrid"]
-    Webhook["Webhook firmado y deduplicación"]
-    Audit["Auditoría por tenant"]
+  end
+  subgraph PG["PostgreSQL compartido"]
+    Business[("Requests, deliveries, attempts, provider_events")]
+    Freq[("Frequency buckets y reservations")]
+    SQ[("Solid Queue: jobs y ejecuciones")]
+    AIData[("AI budgets y template cache")]
+    Future[("COALESCE: grupo y eventos (diseño futuro)")]
+  end
+  LLM["LLM Gateway externo"]
+  SG["SendGrid API + Event Webhook"]
+  Modules --> Web
+  Web --> Business
+  Web --> Freq
+  Web --> SQ
+  SQ --> AI
+  SQ --> Critical
+  SQ --> Standard
+  AI --> LLM
+  AI --> AIData
+  AI --> Business
+  AI --> SQ
+  Critical --> Business
+  Standard --> Business
+  Critical -->|"HTTPS Mail Send"| SG
+  Standard -->|"HTTPS Mail Send"| SG
+  SG -->|"HTTPS webhook firmado"| Web
+  Standard -.->|"Cierre futuro sin nuevo pool"| Future
+  Future -.-> Business
+  Future -.-> Freq
 
-    Producers --> API
-    API --> Registry
-    Registry --> Policy
-
-    Policy -->|"DELIVER: persistir solicitud"| DB
-    Policy -->|"DELIVER: reserva atómica"| Frequency
-    Policy -->|"COALESCE: agrupar sin enviar"| Groups
-    Policy -->|"SUPPRESS: registrar razón"| DB
-
-    Groups -->|"Programar cierre único"| Queue
-    Queue -->|"Job de cierre"| Close
-    Close --> Snapshot
-    Snapshot --> Eligibility
-
-    Eligibility -->|"Canales elegibles"| Frequency
-    Eligibility -->|"Crear entrega consolidada"| DB
-    Eligibility -->|"Sin canales: registrar razón"| DB
-    Frequency -->|"Reserva confirmada"| DB
-
-    DB -->|"Encolar tras persistir"| Queue
-
-    Queue -->|"Solo contenido dinámico"| AI
-    AI -->|"Contexto permitido"| Guard
-    Guard -->|"Prompt sin PII"| LLM
-    LLM -->|"Respuesta estructurada"| Guard
-    Guard -->|"Validado o fallback"| Content
-    Content --> DB
-
-    Queue -->|"Contenido estático o ya generado"| Critical
-    Queue -->|"Contenido estático o ya generado"| Standard
-
-    Critical --> Adapter
-    Standard --> Adapter
-    Adapter -->|"HTTPS API"| SG
-    SG -->|"Eventos del proveedor"| Webhook
-    Webhook --> DB
-
-    DB --> Audit
-    Groups --> Audit
-      linkStyle default stroke:#808080
+        linkStyle default stroke:#808080
