@@ -37,5 +37,8 @@ flowchart TB
   Close --> Business
   Close --> Policy
   Close --> SQ
-
+  Critical -->|"HTTPS API: envío prioritario"| SG
+  Standard -->|"HTTPS API: envío estándar"| SG
+  SG -->|"HTTPS: webhook firmado"| Web
+  
   linkStyle default stroke:#808080
