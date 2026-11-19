@@ -1,0 +1,48 @@
+---
+config:
+  theme: base
+---
+flowchart TB
+  Producers["Módulos Buk: Nómina, Personas, Encuestas"]
+  API["AbstractNotification.deliver"]
+  Registry["Definition Registry"]
+  Policy{"Policy Engine"}
+  DB[("PostgreSQL: requests, deliveries, attempts, events")]
+  Frequency[("Frequency buckets / reservations")]
+  Groups[("Coalescing groups + eventos originales")]
+  Queue[("Solid Queue: jobs en la misma BD")]
+  Close["CloseCoalescingWindowJob"]
+  AI["Pool ai_generation"]
+  Guard["Masking antes de LLM / validar / fallback"]
+  LLM["LLM Gateway"]
+  Critical["Pool delivery_critical"]
+  Standard["Pool delivery_standard"]
+  Adapter["Channel Adapter Registry"]
+  SG["SendGrid"]
+  Webhook["Webhook firmado / deduplicación"]
+  Audit["Auditoría por tenant"]
+  Producers --> API --> Registry --> Policy
+  Policy -->|"DELIVER: persistir y reservar"| DB
+  Policy -->|"DELIVER: reserva atómica"| Frequency
+  Policy -->|"COALESCE: agrupar sin enviar"| Groups
+  Policy -->|"SUPPRESS: razón auditable"| DB
+  Groups -->|"cierre único por ventana"| Queue
+  Queue --> Close
+  Close -->|"snapshot vigente + una entrega"| DB
+  Close -->|"reserva al cerrar"| Frequency
+  DB -->|"job transaccional"| Queue
+  Queue --> AI
+  AI -->|"contexto permitido / placeholders"| Guard
+  Guard --> LLM
+  LLM --> Guard
+  Guard -->|"contenido válido o fallback"| DB
+  Guard -->|"encolar entrega"| Queue
+  Queue --> Critical
+  Queue --> Standard
+  Critical --> Adapter
+  Standard --> Adapter
+  Adapter --> SG
+  SG --> Webhook
+  Webhook --> DB
+  DB --> Audit
+  Groups --> Audit
