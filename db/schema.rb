@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_18_205222) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_18_221000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,10 +27,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_205222) do
     t.datetime "created_at", null: false
     t.string "idempotency_key", null: false
     t.string "status", null: false
-    t.bigint "tenant_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["tenant_id", "idempotency_key"], name: "index_notification_requests_on_tenant_id_and_idempotency_key", unique: true
-    t.index ["tenant_id"], name: "index_notification_requests_on_tenant_id"
+    t.index ["idempotency_key"], name: "index_notification_requests_on_idempotency_key", unique: true
   end
 
   create_table "solid_queue_batch_executions", force: :cascade do |t|
@@ -183,14 +181,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_205222) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
-  create_table "tenants", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "name", null: false
-    t.datetime "updated_at", null: false
-  end
-
   add_foreign_key "notification_deliveries", "notification_requests"
-  add_foreign_key "notification_requests", "tenants"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

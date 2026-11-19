@@ -1,5 +1,4 @@
 class NotificationRequest < ApplicationRecord
-  belongs_to :tenant
   has_many :notification_deliveries, dependent: :destroy
 
   validates :idempotency_key, presence: true

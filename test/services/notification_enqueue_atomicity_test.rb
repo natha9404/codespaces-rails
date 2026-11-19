@@ -23,7 +23,6 @@ class NotificationEnqueueAtomicityTest < ActiveSupport::TestCase
   end
 
   test "un error después de encolar no deja solicitud, entregas ni job" do
-    tenant = tenants(:acme)
     jobs_inside_transaction = nil
 
     assert_no_difference -> { NotificationRequest.count } do
@@ -34,7 +33,6 @@ class NotificationEnqueueAtomicityTest < ActiveSupport::TestCase
             # dentro de los tests transaccionales de Rails.
             NotificationRequest.transaction(requires_new: true) do
               request = NotificationRequest.create!(
-                tenant: tenant,
                 idempotency_key: "test-atomicity-1",
                 status: "REQUEST_ACCEPTED"
               )
