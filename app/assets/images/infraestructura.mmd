@@ -3,42 +3,40 @@ config:
   theme: neo
 ---
 flowchart TB
-  Producers["Módulos internos Buk"]
+  Modules["Módulos internos Buk"]
   subgraph EC2["AWS EC2: procesos separados"]
-    Web["Rails Web: API + auditoría + webhook"]
-    AI["Workers: ai_generation"]
-    Critical["Workers: delivery_critical"]
-    Standard["Workers: delivery_standard"]
-    Close["Worker: cierre COALESCE / reconciliación"]
+    Web["Rails Web: API, auditoría y webhook"]
+    AI["Pool ai_generation"]
+    Critical["Pool delivery_critical"]
+    Standard["Pool delivery_standard"]
   end
-  subgraph PG["PostgreSQL: base primaria compartida"]
+  subgraph PG["PostgreSQL compartido"]
     Business[("Requests, deliveries, attempts, provider_events")]
-    Policy[("Frequency buckets / reservations")]
-    Groups[("Coalescing groups + vínculos a eventos")]
-    AIData[("AI budgets + template cache")]
+    Freq[("Frequency buckets y reservations")]
     SQ[("Solid Queue: jobs y ejecuciones")]
+    AIData[("AI budgets y template cache")]
+    Future[("COALESCE: grupo y eventos (diseño futuro)")]
   end
   LLM["LLM Gateway externo"]
   SG["SendGrid API + Event Webhook"]
-  Producers --> Web
+  Modules --> Web
   Web --> Business
-  Web --> Policy
-  Web --> Groups
+  Web --> Freq
   Web --> SQ
   SQ --> AI
   SQ --> Critical
   SQ --> Standard
-  SQ --> Close
   AI --> LLM
   AI --> AIData
   AI --> Business
   AI --> SQ
-  Close --> Groups
-  Close --> Business
-  Close --> Policy
-  Close --> SQ
-  Critical -->|"HTTPS API: envío prioritario"| SG
-  Standard -->|"HTTPS API: envío estándar"| SG
-  SG -->|"HTTPS: webhook firmado"| Web
-  
-  linkStyle default stroke:#808080
+  Critical --> Business
+  Standard --> Business
+  Critical -->|"HTTPS Mail Send"| SG
+  Standard -->|"HTTPS Mail Send"| SG
+  SG -->|"HTTPS webhook firmado"| Web
+  Standard -.->|"Cierre futuro sin nuevo pool"| Future
+  Future -.-> Business
+  Future -.-> Freq
+
+        linkStyle default stroke:#808080
