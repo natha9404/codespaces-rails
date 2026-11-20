@@ -1,0 +1,49 @@
+---
+config:
+  theme: neo
+---
+sequenceDiagram
+  autonumber
+  participant M as Módulo Buk (servicio de dominio)
+  participant D as AbstractNotification.deliver (Dispatcher)
+  participant P as Policy Engine
+  participant DB as PostgreSQL + Solid Queue (misma transacción)
+  participant W as Worker (DeliveryJob)
+  participant SG as SendGrid
+
+  M->>D: deliver(recipient, context, idempotency_key)
+  D->>DB: BEGIN y crear request (UNIQUE idempotency_key) en RECEIVED
+  alt clave duplicada (reintento del mismo evento)
+    DB-->>D: RecordNotUnique
+    D-->>M: devuelve el request_id existente (sin segunda entrega)
+  else clave nueva
+    D->>P: evaluar preferencias, canales y frecuencia
+    alt DELIVER
+      P-->>D: canales elegibles
+      D->>DB: reservar frecuencia, crear deliveries PENDING, request REQUEST_ACCEPTED, encolar job
+      DB-->>D: COMMIT
+      D-->>M: request_id (sin llamar a SendGrid ni al LLM)
+    else SUPPRESS
+      P-->>D: sin canal elegible o mensaje prescindible
+      D->>DB: request SUPPRESSED + razón auditable, COMMIT
+      D-->>M: request_id
+    end
+  end
+
+  Note over W,DB: Fuera del request HTTP y de toda transacción
+  W->>DB: tomar job (FOR UPDATE SKIP LOCKED), delivery SUBMITTING
+  opt notificación dinámica
+    Note over W: antes, el pool ai_generation genera el contenido: masking, LLM, validación o fallback
+  end
+  W->>SG: POST /v3/mail/send
+  alt HTTP 202
+    SG-->>W: aceptado
+    W->>DB: delivery ACCEPTED + provider_message_id
+  else rechazo del proveedor
+    SG-->>W: error
+    W->>DB: delivery FAILED (PROVIDER_REJECTED)
+  else timeout
+    W->>DB: delivery UNKNOWN (no se reenvía a ciegas, reconciliación y reintento acotado)
+  end
+  SG-)DB: webhook firmado: verificar firma y deduplicar por sg_event_id
+  Note over SG,DB: delivered confirma aceptación por el servidor receptor, no lectura. Delivery pasa a DELIVERED
