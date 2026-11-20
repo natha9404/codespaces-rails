@@ -34,14 +34,14 @@ class NotificationEnqueueAtomicityTest < ActiveSupport::TestCase
             NotificationRequest.transaction(requires_new: true) do
               request = NotificationRequest.create!(
                 idempotency_key: "test-atomicity-1",
-                status: "REQUEST_ACCEPTED"
+                status: "RECEIVED"
               )
-              NotificationDelivery.create!(
+              delivery = NotificationDelivery.create!(
                 notification_request: request,
                 channel: "email",
                 status: "PENDING"
               )
-              DeliveryJob.set(queue: :delivery_critical).perform_later(request.id)
+              DeliveryJob.set(queue: :delivery_critical).perform_later(delivery.id)
 
               jobs_inside_transaction = SolidQueue::Job.count
               raise ForcedFailureAfterEnqueue, "fallo forzado tras encolar"

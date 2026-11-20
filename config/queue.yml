@@ -1,11 +1,21 @@
+# Un pool de workers por etapa, cada uno con capacidad propia, para que la
+# generación con IA no bloquee las entregas ni las estándar a las críticas.
 default: &default
   dispatchers:
     - polling_interval: 1
       batch_size: 500
   workers:
-    - queues: "*"
+    - queues: [ delivery_critical ]
       threads: 3
-      processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
+      processes: <%= ENV.fetch("DELIVERY_CRITICAL_CONCURRENCY", 1) %>
+      polling_interval: 0.1
+    - queues: [ delivery_standard ]
+      threads: 3
+      processes: <%= ENV.fetch("DELIVERY_STANDARD_CONCURRENCY", 1) %>
+      polling_interval: 1
+    - queues: [ ai_generation ]
+      threads: 2
+      processes: <%= ENV.fetch("AI_GENERATION_CONCURRENCY", 1) %>
       polling_interval: 1
 
 development:
