@@ -26,13 +26,4 @@ flowchart TB
   WCR -->|"HTTPS Mail Send"| SG
   WST -->|"HTTPS Mail Send"| SG
   SG -->|"webhook firmado"| WEB
-
-  classDef person fill:#08427b,stroke:#052e56,color:#ffffff
-  classDef node fill:#85bbf0,stroke:#5d82a8,color:#000000
-  classDef store fill:#ffe8cc,stroke:#e67700,color:#000000
-  classDef ext fill:#999999,stroke:#6b6b6b,color:#ffffff
-  class Buk person
-  class WEB,WAI,WCR,WST node
-  class PG store
-  class SG,LLM ext
   linkStyle default stroke:#808080

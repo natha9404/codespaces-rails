@@ -34,13 +34,4 @@ flowchart TB
   SG -->|"webhook firmado"| HOOK
   HOOK -->|"actualiza estado"| DB
   AUD -->|"consulta"| DB
-
-  classDef person fill:#08427b,stroke:#052e56,color:#ffffff
-  classDef comp fill:#85bbf0,stroke:#5d82a8,color:#000000
-  classDef store fill:#ffe8cc,stroke:#e67700,color:#000000
-  classDef ext fill:#999999,stroke:#6b6b6b,color:#ffffff
-  class Buk person
-  class API,DEF,POL,FREQ,DW,AIW,ADP,HOOK,AUD comp
-  class DB store
-  class SG,LLM ext
   linkStyle default stroke:#808080

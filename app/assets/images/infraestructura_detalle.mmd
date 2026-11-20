@@ -42,11 +42,4 @@ flowchart TB
   Standard -.->|"Cierre futuro sin nuevo pool"| Future
   Future -.-> Business
   Future -.-> Freq
-
-  classDef comp fill:#eef3ff,stroke:#3b5bdb,color:#1b1b1b
-  classDef store fill:#fff4e6,stroke:#e67700,color:#1b1b1b
-  classDef ext fill:#f1f3f5,stroke:#495057,color:#1b1b1b
-  class Modules,Web,AI,Critical,Standard comp
-  class Business,Freq,SQ,AIData,Future store
-  class LLM,SG ext
   linkStyle default stroke:#808080

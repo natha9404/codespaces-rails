@@ -34,14 +34,6 @@ flowchart TB
     LLM["LLM Gateway"]
     SG["SendGrid"]
   end
-  subgraph LEG["Leyenda"]
-    direction LR
-    K1["Componente"]:::comp
-    K2[("Almacén PostgreSQL")]:::store
-    K3["Sistema externo"]:::ext
-    K4["Fallo o riesgo"]:::risk
-    K5["Línea punteada: extensión propuesta (COALESCE) o camino de fallo"]
-  end
   Registry --> Policy
   Policy -->|"DELIVER: idempotencia (UNIQUE), admitir y reservar"| DB
   Policy -->|"SUPPRESS: razón auditable"| DB
@@ -68,13 +60,4 @@ flowchart TB
   Hook --> DB
   DB --> Audit
   Group -.-> Audit
-
-  classDef comp fill:#eef3ff,stroke:#3b5bdb,color:#1b1b1b
-  classDef store fill:#fff4e6,stroke:#e67700,color:#1b1b1b
-  classDef ext fill:#f1f3f5,stroke:#495057,color:#1b1b1b
-  classDef risk fill:#fff0f0,stroke:#c92a2a,color:#1b1b1b
-  class Modules,API,Registry,Policy,Eligibility,AI,Critical,Standard,Adapter,Hook,Guard,Audit comp
-  class DB,SQ,Freq,Group store
-  class LLM,SG ext
-  class NoChannel,Fallback risk
   linkStyle default stroke:#808080
