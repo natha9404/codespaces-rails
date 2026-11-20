@@ -3,16 +3,16 @@ config:
   theme: neo
 ---
 flowchart TB
-  Modules["Módulos Buk"] --> API["AbstractNotification.deliver"]
-  API --> Registry["Definition Registry"] --> Policy{"Policy Engine"}
-  Policy -->|"DELIVER: admitir y reservar"| DB[("PostgreSQL: requests y deliveries")]
+  Modules["Módulos Buk (servicio de dominio)"] --> API["AbstractNotification.deliver: devuelve request_id"]
+  API --> Registry["Definition Registry"] --> Policy{"Policy Engine: preferencias y canales"}
+  Policy -->|"DELIVER: idempotencia (UNIQUE), admitir y reservar"| DB[("PostgreSQL: requests y deliveries")]
   Policy -->|"SUPPRESS: razón auditable"| DB
   Policy -.->|"COALESCE: extensión propuesta"| Group[("Grupo por destinatario, entidad y ventana")]
   Group -.->|"Cierre futuro en delivery_standard"| Eligibility["Estado vigente + reevaluar canales"]
   Eligibility -.->|"Sin cupo: reprogramar, no suprimir"| Group
   Eligibility -.->|"Entrega consolidada y reserva única"| DB
   Policy --> Freq[("Frequency buckets y reservations")]
-  DB -->|"Encolado en misma transacción"| SQ[("Solid Queue")]
+  DB -->|"Encolado en misma transacción"| SQ[("Solid Queue (misma base PostgreSQL)")]
   SQ -->|"Solo dinámicas"| AI["Pool ai_generation"]
   AI --> Guard["Masking, validación y fallback"]
   Guard --> LLM["LLM Gateway"]
@@ -25,9 +25,7 @@ flowchart TB
   Adapter --> SG["SendGrid"]
   SG --> Hook["Webhook firmado y deduplicado"]
   Hook --> DB
-  DB --> Audit["Auditoría por solicitud, canal e intento"]
+  DB --> Audit["Auditoría / Soporte: filtro por fecha, destinatario y canal"]
   Group -.-> Audit
-
-
 
         linkStyle default stroke:#808080

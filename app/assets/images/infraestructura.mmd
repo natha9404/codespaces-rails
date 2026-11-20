@@ -5,12 +5,12 @@ config:
 flowchart TB
   Modules["Módulos internos Buk"]
   subgraph EC2["AWS EC2: procesos separados"]
-    Web["Rails Web: API, auditoría y webhook"]
+    Web["Rails (monolito): deliver, auditoría y webhook"]
     AI["Pool ai_generation"]
     Critical["Pool delivery_critical"]
     Standard["Pool delivery_standard"]
   end
-  subgraph PG["PostgreSQL compartido"]
+  subgraph PG["PostgreSQL compartido (misma transacción para admisión y cola)"]
     Business[("Requests, deliveries, attempts, provider_events")]
     Freq[("Frequency buckets y reservations")]
     SQ[("Solid Queue: jobs y ejecuciones")]
@@ -20,23 +20,10 @@ flowchart TB
   LLM["LLM Gateway externo"]
   SG["SendGrid API + Event Webhook"]
   Modules --> Web
-  Web --> Business
-  Web --> Freq
-  Web --> SQ
-  SQ --> AI
-  SQ --> Critical
-  SQ --> Standard
-  AI --> LLM
-  AI --> AIData
-  AI --> Business
-  AI --> SQ
-  Critical --> Business
-  Standard --> Business
+  EC2 <-->|"Lectura y escritura; los workers toman jobs de Solid Queue"| PG
+  AI -->|"HTTPS"| LLM
   Critical -->|"HTTPS Mail Send"| SG
   Standard -->|"HTTPS Mail Send"| SG
   SG -->|"HTTPS webhook firmado"| Web
-  Standard -.->|"Cierre futuro sin nuevo pool"| Future
-  Future -.-> Business
-  Future -.-> Freq
 
         linkStyle default stroke:#808080
