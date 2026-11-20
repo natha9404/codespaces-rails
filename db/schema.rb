@@ -23,8 +23,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_19_220000) do
     t.string "recipient_lookup_hash"
     t.string "status", null: false
     t.datetime "updated_at", null: false
-    t.index ["notification_request_id"], name: "index_notification_deliveries_on_notification_request_id"
     t.index ["notification_request_id", "channel"], name: "index_notification_deliveries_on_request_and_channel", unique: true
+    t.index ["notification_request_id"], name: "index_notification_deliveries_on_notification_request_id"
   end
 
   create_table "notification_requests", force: :cascade do |t|
