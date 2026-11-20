@@ -3,78 +3,44 @@ config:
   theme: neo
 ---
 flowchart TB
-  subgraph L1["1. ENTRADA — síncrona, sin llamadas externas"]
-    Modules["Módulos Buk (servicio de dominio)"] -->|"deliver(recipient, context, idempotency_key)"| API["AbstractNotification.deliver: devuelve request_id"]
-    API --> Registry["Definition Registry"]
+  Buk(["<b>Módulos Buk</b><br/>[Sistema interno]<br/>Declaran qué comunicar"])
+  subgraph CN["<b>Central de notificaciones</b> — Rails 8.1, monolito modular [Contenedor]"]
+    API["<b>Notification API</b><br/>[AbstractNotification.deliver]<br/>Valida, exige idempotency_key, devuelve request_id"]
+    DEF["<b>Definition Registry</b><br/>[Ruby]<br/>Contenido, prioridad y clasificación"]
+    POL["<b>Policy Engine</b><br/>[Ruby]<br/>DELIVER, COALESCE o SUPPRESS con razón auditable"]
+    FREQ["<b>Frequency Policy</b><br/>[Ruby]<br/>Reserva atómica de cupo por destinatario"]
+    DW["<b>Delivery Workers</b><br/>[Solid Queue: delivery_critical y delivery_standard]<br/>Envían y registran el resultado"]
+    AIW["<b>AI Generation Worker</b><br/>[Solid Queue: ai_generation]<br/>Masking, validación y fallback"]
+    ADP["<b>Channel Adapter Registry</b><br/>[SendgridEmailAdapter]<br/>Un adaptador por canal"]
+    HOOK["<b>Webhook Receiver</b><br/>[Controller]<br/>Verifica firma y deduplica eventos"]
+    AUD["<b>Auditoría / Soporte</b><br/>[Controller]<br/>Filtra por fecha, destinatario y canal"]
   end
-  subgraph L2["2. GOBIERNO — políticas y admisión"]
-    Policy{"Policy Engine: preferencias y canales"}
-    Freq[("Frequency buckets y reservations")]
-    Group[("Grupo por destinatario, entidad y ventana")]
-    Eligibility["Estado vigente + reevaluar canales"]
-    NoChannel["Critical sin canal elegible: canal corporativo o fallo crítico + escalar al emisor"]
-  end
-  subgraph L3["3. PERSISTENCIA — PostgreSQL, fuente de verdad"]
-    DB[("PostgreSQL: requests y deliveries")]
-    SQ[("Solid Queue (misma base PostgreSQL)")]
-    Audit["Auditoría / Soporte: filtro por fecha, destinatario y canal"]
-  end
-  subgraph L4["4. EJECUCIÓN — workers asíncronos, pools aislados"]
-    AI["Pool ai_generation"]
-    Critical["Pool delivery_critical"]
-    Standard["Pool delivery_standard"]
-    Adapter["Channel Adapter Registry"]
-    Hook["Webhook firmado y deduplicado"]
-  end
-  subgraph L5["5. IA — privacidad y costo"]
-    Guard["Masking, validación y fallback"]
-    Fallback["Fallback determinista: fallo de IA, presupuesto o validación"]
-  end
-  subgraph L6["6. EXTERNOS — fuera de nuestra frontera"]
-    LLM["LLM Gateway"]
-    SG["SendGrid"]
-  end
-  subgraph LEG["Leyenda"]
-    direction LR
-    K1["Componente"]:::comp
-    K2[("Almacén PostgreSQL")]:::store
-    K3["Sistema externo"]:::ext
-    K4["Fallo o riesgo"]:::risk
-    K5["Línea punteada: extensión propuesta (COALESCE) o camino de fallo"]
-  end
-  Registry --> Policy
-  Policy -->|"DELIVER: idempotencia (UNIQUE), admitir y reservar"| DB
-  Policy -->|"SUPPRESS: razón auditable"| DB
-  Policy -.->|"COALESCE: extensión propuesta"| Group
-  Policy --> Freq
-  Policy -->|"critical sin canal"| NoChannel
-  Group -.->|"Cierre futuro en delivery_standard"| Eligibility
-  Eligibility -.->|"Sin cupo: reprogramar, no suprimir"| Group
-  Eligibility -.->|"Entrega consolidada y reserva única"| DB
-  DB -->|"Encolado en misma transacción"| SQ
-  SQ -->|"Solo dinámicas"| AI
-  AI --> Guard
-  Guard --> LLM
-  LLM --> Guard
-  Guard -.->|"si falla"| Fallback
-  Guard -->|"Persistir contenido; encolar entrega"| DB
-  SQ --> Critical
-  SQ --> Standard
-  Critical --> Adapter
-  Standard --> Adapter
-  Adapter --> SG
-  Adapter -.->|"timeout: UNKNOWN; reintento acotado y reconciliación"| DB
-  SG --> Hook
-  Hook --> DB
-  DB --> Audit
-  Group -.-> Audit
+  DB[("<b>PostgreSQL</b><br/>[Base de datos]<br/>Requests, deliveries, attempts, provider_events, frecuencia y Solid Queue")]
+  SG(["<b>SendGrid</b><br/>[Sistema externo]<br/>Correo y Event Webhook"])
+  LLM(["<b>LLM Gateway</b><br/>[Sistema externo]<br/>Generación estructurada"])
 
-  classDef comp fill:#eef3ff,stroke:#3b5bdb,color:#1b1b1b
-  classDef store fill:#fff4e6,stroke:#e67700,color:#1b1b1b
-  classDef ext fill:#f1f3f5,stroke:#495057,color:#1b1b1b
-  classDef risk fill:#fff0f0,stroke:#c92a2a,color:#1b1b1b
-  class Modules,API,Registry,Policy,Eligibility,AI,Critical,Standard,Adapter,Hook,Guard,Audit comp
-  class DB,SQ,Freq,Group store
-  class LLM,SG ext
-  class NoChannel,Fallback risk
+  Buk -->|"deliver()"| API
+  API -->|"resuelve"| DEF
+  API -->|"consulta"| POL
+  POL -->|"reserva"| FREQ
+  API -->|"persiste y encola<br/>en una transacción"| DB
+  DB -->|"entrega jobs"| DW
+  DB -->|"entrega jobs dinámicos"| AIW
+  AIW -->|"HTTPS"| LLM
+  AIW -->|"guarda contenido"| DB
+  DW -->|"usa"| ADP
+  ADP -->|"HTTPS Mail Send"| SG
+  DW -->|"registra intento y estado"| DB
+  SG -->|"webhook firmado"| HOOK
+  HOOK -->|"actualiza estado"| DB
+  AUD -->|"consulta"| DB
+
+  classDef person fill:#08427b,stroke:#052e56,color:#ffffff
+  classDef comp fill:#85bbf0,stroke:#5d82a8,color:#000000
+  classDef store fill:#ffe8cc,stroke:#e67700,color:#000000
+  classDef ext fill:#999999,stroke:#6b6b6b,color:#ffffff
+  class Buk person
+  class API,DEF,POL,FREQ,DW,AIW,ADP,HOOK,AUD comp
+  class DB store
+  class SG,LLM ext
   linkStyle default stroke:#808080

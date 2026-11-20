@@ -3,50 +3,36 @@ config:
   theme: neo
 ---
 flowchart TB
-  Modules["Módulos internos Buk"]
-  subgraph AWS["Frontera AWS — cifrado en reposo; contexto y destinatarios sensibles fuera de logs"]
-    subgraph EC2["AWS EC2: procesos separados"]
-      Web["Rails (monolito): deliver, auditoría y webhook"]
-      AI["Pool ai_generation"]
-      Critical["Pool delivery_critical"]
-      Standard["Pool delivery_standard"]
+  Buk(["<b>Módulos internos Buk</b><br/>[Sistema interno]"])
+  subgraph AWS["<b>AWS</b> — cifrado en reposo; sin datos sensibles en logs"]
+    subgraph EC2["<b>Instancias EC2</b> — procesos separados"]
+      WEB["<b>Rails web</b><br/>[Puma]<br/>deliver, auditoría y webhook"]
+      WAI["<b>Pool ai_generation</b><br/>[Solid Queue]"]
+      WCR["<b>Pool delivery_critical</b><br/>[Solid Queue]"]
+      WST["<b>Pool delivery_standard</b><br/>[Solid Queue]"]
     end
-    subgraph PG["PostgreSQL compartido (misma transacción para admisión y cola)"]
-      Business[("Requests, deliveries, attempts, provider_events")]
-      Freq[("Frequency buckets y reservations")]
-      SQ[("Solid Queue: jobs y ejecuciones")]
-      AIData[("AI budgets y template cache")]
-      Future[("COALESCE: grupo y eventos (diseño futuro)")]
-    end
+    PG[("<b>PostgreSQL compartido</b><br/>Requests, deliveries, attempts, provider_events,<br/>Solid Queue, frecuencia, AI budgets y caché,<br/>COALESCE (diseño futuro)")]
   end
-  subgraph EXT["Servicios externos — frontera de confianza"]
-    LLM["LLM Gateway externo"]
-    SG["SendGrid API + Event Webhook"]
+  subgraph EXT["<b>Servicios externos</b> — frontera de confianza"]
+    SG(["<b>SendGrid</b><br/>API + Event Webhook"])
+    LLM(["<b>LLM Gateway</b>"])
   end
-  Modules --> Web
-  Web --> Business
-  Web --> Freq
-  Web --> SQ
-  SQ --> AI
-  SQ --> Critical
-  SQ --> Standard
-  AI --> LLM
-  AI --> AIData
-  AI --> Business
-  AI --> SQ
-  Critical --> Business
-  Standard --> Business
-  Critical -->|"HTTPS Mail Send"| SG
-  Standard -->|"HTTPS Mail Send"| SG
-  SG -->|"HTTPS webhook firmado (se verifica la firma)"| Web
-  Standard -.->|"Cierre futuro sin nuevo pool"| Future
-  Future -.-> Business
-  Future -.-> Freq
+  Buk -->|"invoca deliver"| WEB
+  WEB -->|"lee, escribe y encola (misma transacción)"| PG
+  PG <-->|"jobs y contenido"| WAI
+  PG <-->|"jobs e intentos"| WCR
+  PG <-->|"jobs e intentos"| WST
+  WAI -->|"HTTPS"| LLM
+  WCR -->|"HTTPS Mail Send"| SG
+  WST -->|"HTTPS Mail Send"| SG
+  SG -->|"webhook firmado"| WEB
 
-  classDef comp fill:#eef3ff,stroke:#3b5bdb,color:#1b1b1b
-  classDef store fill:#fff4e6,stroke:#e67700,color:#1b1b1b
-  classDef ext fill:#f1f3f5,stroke:#495057,color:#1b1b1b
-  class Modules,Web,AI,Critical,Standard comp
-  class Business,Freq,SQ,AIData,Future store
-  class LLM,SG ext
+  classDef person fill:#08427b,stroke:#052e56,color:#ffffff
+  classDef node fill:#85bbf0,stroke:#5d82a8,color:#000000
+  classDef store fill:#ffe8cc,stroke:#e67700,color:#000000
+  classDef ext fill:#999999,stroke:#6b6b6b,color:#ffffff
+  class Buk person
+  class WEB,WAI,WCR,WST node
+  class PG store
+  class SG,LLM ext
   linkStyle default stroke:#808080
