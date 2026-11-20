@@ -20,10 +20,23 @@ flowchart TB
   LLM["LLM Gateway externo"]
   SG["SendGrid API + Event Webhook"]
   Modules --> Web
-  EC2 <-->|"Lectura y escritura; los workers toman jobs de Solid Queue"| PG
-  AI -->|"HTTPS"| LLM
+  Web --> Business
+  Web --> Freq
+  Web --> SQ
+  SQ --> AI
+  SQ --> Critical
+  SQ --> Standard
+  AI --> LLM
+  AI --> AIData
+  AI --> Business
+  AI --> SQ
+  Critical --> Business
+  Standard --> Business
   Critical -->|"HTTPS Mail Send"| SG
   Standard -->|"HTTPS Mail Send"| SG
   SG -->|"HTTPS webhook firmado"| Web
+  Standard -.->|"Cierre futuro sin nuevo pool"| Future
+  Future -.-> Business
+  Future -.-> Freq
 
         linkStyle default stroke:#808080
