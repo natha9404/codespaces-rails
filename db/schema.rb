@@ -10,22 +10,30 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_18_221000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_19_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "notification_deliveries", force: :cascade do |t|
     t.string "channel", null: false
     t.datetime "created_at", null: false
+    t.string "decision_reason"
     t.bigint "notification_request_id", null: false
+    t.string "provider_message_id"
+    t.string "recipient_lookup_hash"
     t.string "status", null: false
     t.datetime "updated_at", null: false
+    t.index ["notification_request_id", "channel"], name: "index_notification_deliveries_on_request_and_channel", unique: true
     t.index ["notification_request_id"], name: "index_notification_deliveries_on_notification_request_id"
   end
 
   create_table "notification_requests", force: :cascade do |t|
+    t.text "context_ciphertext"
     t.datetime "created_at", null: false
+    t.string "decision_reason"
     t.string "idempotency_key", null: false
+    t.string "notification_type"
+    t.string "priority", default: "standard", null: false
     t.string "status", null: false
     t.datetime "updated_at", null: false
     t.index ["idempotency_key"], name: "index_notification_requests_on_idempotency_key", unique: true
