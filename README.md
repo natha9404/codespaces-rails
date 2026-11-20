@@ -1,7 +1,35 @@
-# GitHub Codespaces ♥️ Ruby on Rails
+# Central de notificaciones: prototipo
 
-Welcome to your shiny new Codespace running Rails! We've got everything fired up and running for you to explore Rails.
+Prototipo de la propuesta técnica *Central de notificaciones* (Buk, Core AI).
+Implementa un **flujo mínimo** que corre y tiene pruebas. El resto del diseño
+(IA, COALESCE, frecuencia, auditoría) vive en el documento técnico, no aquí.
 
-You've got a blank canvas to work on from a git perspective as well. There's a single initial commit with what you're seeing right now - where you go from here is up to you!
+## Qué está implementado
 
-Everything you do here is contained within this one codespace. There is no repository on GitHub yet. If and when you’re ready you can click "Publish Branch" and we’ll create your repository and push up your project. If you were just exploring then and have no further need for this code then you can simply delete your codespace and it's gone forever.
+```
+Notification.deliver(recipient, context:, idempotency_key:)
+  → Notifications::Dispatcher   transacción corta: solicitud + entregas + jobs
+  → Notifications::PolicyEngine DELIVER o SUPPRESS (sin canal elegible)
+  → DeliveryJob                 un job por entrega; cola crítica o estándar
+  → SendgridEmailAdapter        cliente SendGrid simulado (sin red); 202 = ACCEPTED
+```
+
+- **Idempotencia:** `UNIQUE(idempotency_key)`; una repetición devuelve la solicitud original.
+- **Atomicidad:** Solid Queue comparte el pool de la aplicación; ver `test/services/notification_enqueue_atomicity_test.rb`.
+- **Entregas inciertas:** un timeout deja la entrega en `UNKNOWN`; no se reenvía a ciegas.
+- **Datos personales:** contexto cifrado y destinatario como HMAC en la base.
+- **Pools por etapa:** `config/queue.yml` define workers para `delivery_critical`, `delivery_standard` y `ai_generation`.
+
+## Qué es solo diseño (no está en el código)
+
+Generación con IA y guardrails, Frequency Capping, COALESCE, webhook de SendGrid,
+reconciliación y la interfaz de auditoría.
+
+## Ejecutar
+
+PostgreSQL debe escuchar en `localhost:5433` (ver `config/database.yml`).
+
+```bash
+bin/rails db:prepare
+bin/rails test
+```
