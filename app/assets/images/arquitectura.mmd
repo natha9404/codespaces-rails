@@ -15,6 +15,7 @@ flowchart TB
     ADP["<b>Channel Adapter Registry</b><br/>[SendgridEmailAdapter]<br/>Un adaptador por canal"]
     HOOK["<b>Webhook Receiver</b><br/>[Controller]<br/>Verifica firma y deduplica eventos"]
     AUD["<b>Auditoría / Soporte</b><br/>[Controller]<br/>Filtra por fecha, destinatario y canal"]
+    COAL["<b>Coalescing Scheduler</b><br/>[extensión propuesta]<br/>Cierra grupos y crea una entrega consolidada"]
   end
   DB[("<b>PostgreSQL</b><br/>[Base de datos]<br/>Requests, deliveries, attempts, provider_events, frecuencia y Solid Queue")]
   SG(["<b>SendGrid</b><br/>[Sistema externo]<br/>Correo y Event Webhook"])
@@ -24,6 +25,8 @@ flowchart TB
   API -->|"resuelve"| DEF
   API -->|"consulta"| POL
   POL -->|"reserva"| FREQ
+  POL -.->|"COALESCE"| COAL
+  COAL -.->|"crea entrega única"| DB
   API -->|"persiste y encola<br/>en una transacción"| DB
   DB -->|"entrega jobs"| DW
   DB -->|"entrega jobs dinámicos"| AIW
