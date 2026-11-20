@@ -4,21 +4,25 @@ config:
 ---
 flowchart TB
   Modules["Módulos internos Buk"]
-  subgraph EC2["AWS EC2: procesos separados"]
-    Web["Rails (monolito): deliver, auditoría y webhook"]
-    AI["Pool ai_generation"]
-    Critical["Pool delivery_critical"]
-    Standard["Pool delivery_standard"]
+  subgraph AWS["Frontera AWS — cifrado en reposo; contexto y destinatarios sensibles fuera de logs"]
+    subgraph EC2["AWS EC2: procesos separados"]
+      Web["Rails (monolito): deliver, auditoría y webhook"]
+      AI["Pool ai_generation"]
+      Critical["Pool delivery_critical"]
+      Standard["Pool delivery_standard"]
+    end
+    subgraph PG["PostgreSQL compartido (misma transacción para admisión y cola)"]
+      Business[("Requests, deliveries, attempts, provider_events")]
+      Freq[("Frequency buckets y reservations")]
+      SQ[("Solid Queue: jobs y ejecuciones")]
+      AIData[("AI budgets y template cache")]
+      Future[("COALESCE: grupo y eventos (diseño futuro)")]
+    end
   end
-  subgraph PG["PostgreSQL compartido (misma transacción para admisión y cola)"]
-    Business[("Requests, deliveries, attempts, provider_events")]
-    Freq[("Frequency buckets y reservations")]
-    SQ[("Solid Queue: jobs y ejecuciones")]
-    AIData[("AI budgets y template cache")]
-    Future[("COALESCE: grupo y eventos (diseño futuro)")]
+  subgraph EXT["Servicios externos — frontera de confianza"]
+    LLM["LLM Gateway externo"]
+    SG["SendGrid API + Event Webhook"]
   end
-  LLM["LLM Gateway externo"]
-  SG["SendGrid API + Event Webhook"]
   Modules --> Web
   Web --> Business
   Web --> Freq
@@ -34,9 +38,15 @@ flowchart TB
   Standard --> Business
   Critical -->|"HTTPS Mail Send"| SG
   Standard -->|"HTTPS Mail Send"| SG
-  SG -->|"HTTPS webhook firmado"| Web
+  SG -->|"HTTPS webhook firmado (se verifica la firma)"| Web
   Standard -.->|"Cierre futuro sin nuevo pool"| Future
   Future -.-> Business
   Future -.-> Freq
 
-        linkStyle default stroke:#808080
+  classDef comp fill:#eef3ff,stroke:#3b5bdb,color:#1b1b1b
+  classDef store fill:#fff4e6,stroke:#e67700,color:#1b1b1b
+  classDef ext fill:#f1f3f5,stroke:#495057,color:#1b1b1b
+  class Modules,Web,AI,Critical,Standard comp
+  class Business,Freq,SQ,AIData,Future store
+  class LLM,SG ext
+  linkStyle default stroke:#808080
